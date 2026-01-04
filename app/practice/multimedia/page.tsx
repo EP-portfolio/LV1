@@ -7,7 +7,7 @@ import AudioTranslationExercise from '@/components/practice/AudioTranslationExer
 export default function MultimediaPracticePage() {
   const [exerciseType, setExerciseType] = useState<'image' | 'audio'>('image')
   const [direction, setDirection] = useState<'fr_to_en' | 'en_to_fr'>('fr_to_en')
-  const [level, setLevel] = useState('intermédiaire')
+  const [level, setLevel] = useState('débutant')
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
