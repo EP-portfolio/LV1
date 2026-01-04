@@ -19,13 +19,13 @@ export default function MultimediaPracticePage() {
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-gray-900">
                 Type d'exercice
               </label>
               <select
                 value={exerciseType}
                 onChange={(e) => setExerciseType(e.target.value as 'image' | 'audio')}
-                className="w-full p-2 border border-gray-300 rounded-lg"
+                className="w-full p-2 border-2 border-gray-400 rounded-lg bg-white text-gray-900 font-medium focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="image">Avec image</option>
                 <option value="audio">Écoute</option>
@@ -33,13 +33,13 @@ export default function MultimediaPracticePage() {
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-gray-900">
                 Direction
               </label>
               <select
                 value={direction}
                 onChange={(e) => setDirection(e.target.value as 'fr_to_en' | 'en_to_fr')}
-                className="w-full p-2 border border-gray-300 rounded-lg"
+                className="w-full p-2 border-2 border-gray-400 rounded-lg bg-white text-gray-900 font-medium focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="fr_to_en">Français vers Anglais</option>
                 <option value="en_to_fr">Anglais vers Français</option>
@@ -47,13 +47,13 @@ export default function MultimediaPracticePage() {
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-gray-900">
                 Niveau
               </label>
               <select
                 value={level}
                 onChange={(e) => setLevel(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-lg"
+                className="w-full p-2 border-2 border-gray-400 rounded-lg bg-white text-gray-900 font-medium focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="débutant">Niveau 1 - Débutant (Swipe + Audio)</option>
                 <option value="intermédiaire">Niveau 2 - Intermédiaire (Swipe uniquement)</option>
