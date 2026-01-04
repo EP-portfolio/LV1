@@ -11,8 +11,13 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "import-vocab": "tsx scripts/import-300-words.ts",
+    "import-phrases": "tsx scripts/import-social-phrases.ts",
     "fetch-images": "tsx scripts/fetch-images-for-vocab.ts",
     "check-api": "tsx scripts/check-api-config.ts",
+    "check-db": "tsx scripts/check-database-connection.ts",
+    "check-supabase": "tsx scripts/check-supabase-config.ts",
+    "pre-deploy": "tsx scripts/pre-deploy-check.ts",
+    "delete-users": "tsx scripts/delete-all-users.ts",
     "setup-storage": "tsx scripts/setup-supabase-storage.ts",
     "test-gemini": "tsx scripts/test-gemini-models.ts"
   },

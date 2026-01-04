@@ -136,3 +136,15 @@ enum MedalType {
   SILVER  // Niveau 2 complété
   GOLD    // Niveau 3 complété
 }
+
+model SocialPhrase {
+  id            String   @id @default(cuid())
+  frenchPhrase  String   @unique
+  englishPhrase String
+  category      String   // présentation, météo, demande_info, etc.
+  audioUrlFr    String?  // URL audio français (généré via Google TTS)
+  audioUrlEn    String?  // URL audio anglais (généré via Google TTS)
+  createdAt     DateTime @default(now())
+  
+  @@index([category])
+}
