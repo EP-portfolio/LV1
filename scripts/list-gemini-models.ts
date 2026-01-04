@@ -103,7 +103,7 @@ async function listModels() {
       
       if (workingModels.length > 0) {
         console.log(`\n💡 Modèles recommandés (supportent generateContent):`)
-        workingModels.forEach(model => {
+        workingModels.forEach((model: string) => {
           console.log(`   - ${model}`)
         })
         console.log(`\n📝 Ajoutez dans .env.local:`)
