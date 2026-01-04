@@ -28,6 +28,7 @@ export default function AudioRepetitionExercise() {
   const [phrase, setPhrase] = useState<SocialPhrase | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [isActive, setIsActive] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const audioRefFr = useRef<HTMLAudioElement | null>(null)
   const audioRefEn = useRef<HTMLAudioElement | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -61,14 +62,25 @@ export default function AudioRepetitionExercise() {
           router.push('/login')
           return
         }
-        throw new Error('Erreur lors du chargement')
+        
+        const errorData = await response.json().catch(() => ({ error: 'Erreur inconnue' }))
+        const errorMessage = errorData.error || `Erreur ${response.status}`
+        
+        if (response.status === 404 && errorMessage.includes('Aucune phrase')) {
+          throw new Error('Aucune phrase disponible. Veuillez exécuter: npm run import-phrases')
+        }
+        
+        throw new Error(errorMessage)
       }
 
       const data: SocialPhrase = await response.json()
       setPhrase(data)
+      setError(null)
       setPhase('idle')
     } catch (error) {
       console.error('Erreur:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Erreur lors du chargement'
+      setError(errorMessage)
       setPhase('idle')
     }
   }
@@ -273,7 +285,28 @@ export default function AudioRepetitionExercise() {
   if (!phrase && phase !== 'loading') {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-xl text-red-600">Erreur lors du chargement de la phrase</div>
+        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6 max-w-2xl">
+          <h3 className="text-xl font-bold text-red-800 mb-2">Erreur lors du chargement</h3>
+          <p className="text-red-700 mb-4">
+            {error || 'Erreur lors du chargement de la phrase'}
+          </p>
+          {error?.includes('Aucune phrase disponible') && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-4">
+              <p className="text-yellow-800 text-sm">
+                <strong>Solution :</strong> Exécutez la commande suivante dans votre terminal :
+              </p>
+              <code className="block mt-2 p-2 bg-yellow-100 rounded text-sm">
+                npm run import-phrases
+              </code>
+            </div>
+          )}
+          <button
+            onClick={loadPhrase}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Réessayer
+          </button>
+        </div>
       </div>
     )
   }
