@@ -1,0 +1,138 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  age           Int?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  practiceSessions PracticeSession[]
+  progress      Progress[]
+  weeklyWords   WeeklyWord[]
+  weeklyMedals  WeeklyMedal[]
+}
+
+model PracticeSession {
+  id            String   @id @default(cuid())
+  userId        String
+  type          PracticeType
+  direction     TranslationDirection
+  mode          PracticeMode
+  score         Float
+  totalQuestions Int
+  correctAnswers Int
+  duration      Int      // en secondes
+  createdAt     DateTime @default(now())
+  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions     Question[]
+}
+
+model Question {
+  id                String   @id @default(cuid())
+  practiceSessionId String
+  originalText      String
+  userAnswer        String?
+  correctAnswer     String
+  isCorrect         Boolean?
+  feedback          String?
+  audioUrl          String?  // URL de l'audio généré
+  imageUrl          String?  // URL de l'image
+  createdAt         DateTime @default(now())
+  
+  practiceSession   PracticeSession @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+}
+
+model Progress {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  level         String   // débutant, intermédiaire, avancé
+  totalSessions Int      @default(0)
+  averageScore  Float    @default(0)
+  streak        Int      @default(0) // jours consécutifs
+  lastPractice  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum PracticeType {
+  TRANSLATION
+  VOCABULARY
+  GRAMMAR
+}
+
+enum TranslationDirection {
+  FR_TO_EN
+  EN_TO_FR
+}
+
+enum PracticeMode {
+  WRITTEN
+  ORAL
+}
+
+model VocabularyWord {
+  id            String   @id @default(cuid())
+  frenchWord    String   @unique
+  englishWord   String
+  category      String?  // Catégorie (ex: "produits_consommation", "verbes_courants", etc.)
+  imageUrl      String?  // URL de l'image (peut être une URL externe ou Supabase Storage)
+  audioUrl      String?  // URL de l'audio (prononciation anglaise)
+  createdAt     DateTime  @default(now())
+  
+  weeklyWords   WeeklyWord[]
+  
+  @@index([category])
+}
+
+model WeeklyWord {
+  id            String   @id @default(cuid())
+  userId        String
+  vocabularyWordId String
+  weekStart     DateTime // Début de la semaine (lundi 00:00)
+  weekEnd       DateTime // Fin de la semaine (dimanche 23:59)
+  level1Completed Boolean @default(false)
+  level2Completed Boolean @default(false)
+  level3Completed Boolean @default(false)
+  createdAt     DateTime @default(now())
+  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabularyWord VocabularyWord @relation(fields: [vocabularyWordId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, vocabularyWordId, weekStart])
+  @@index([userId, weekStart])
+}
+
+model WeeklyMedal {
+  id            String   @id @default(cuid())
+  userId        String
+  weekStart     DateTime // Début de la semaine
+  weekEnd       DateTime // Fin de la semaine
+  medalType     MedalType // BRONZE, SILVER, GOLD
+  earnedAt      DateTime @default(now())
+  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, weekStart, medalType])
+  @@index([userId])
+}
+
+enum MedalType {
+  BRONZE  // Niveau 1 complété
+  SILVER  // Niveau 2 complété
+  GOLD    // Niveau 3 complété
+}
