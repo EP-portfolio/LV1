@@ -47,8 +47,20 @@ export async function GET() {
     })
   } catch (error: any) {
     console.error('Erreur récupération mot vocabulaire:', error)
+    
+    // Message d'erreur plus spécifique pour les problèmes de connexion DB
+    let errorMessage = error.message || 'Erreur lors de la récupération'
+    
+    if (error.message?.includes('Can\'t reach database server') || 
+        error.message?.includes('database server')) {
+      errorMessage = 'Erreur de connexion à la base de données. Vérifiez que DATABASE_URL est correctement configurée dans Vercel.'
+    } else if (error.message?.includes('DATABASE_URL') || 
+               error.message?.includes('environment variable')) {
+      errorMessage = 'DATABASE_URL n\'est pas configurée. Ajoutez-la dans Vercel Environment Variables.'
+    }
+    
     return NextResponse.json(
-      { error: error.message || 'Erreur lors de la récupération' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
