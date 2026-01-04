@@ -92,13 +92,20 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Commencer un exercice
           </h2>
-          <div className="flex justify-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Link
               href="/practice/multimedia"
-              className="bg-white border-2 border-purple-600 text-purple-700 p-6 rounded-lg hover:bg-purple-50 transition-all shadow-sm hover:shadow-md max-w-md w-full"
+              className="bg-white border-2 border-purple-600 text-purple-700 p-6 rounded-lg hover:bg-purple-50 transition-all shadow-sm hover:shadow-md"
             >
               <h3 className="text-xl font-semibold mb-2">Exercices multimédias</h3>
               <p className="text-gray-600 text-sm">Apprenez avec des images et des exercices audio pour une expérience immersive.</p>
+            </Link>
+            <Link
+              href="/practice/audio-repetition"
+              className="bg-white border-2 border-blue-600 text-blue-700 p-6 rounded-lg hover:bg-blue-50 transition-all shadow-sm hover:shadow-md"
+            >
+              <h3 className="text-xl font-semibold mb-2">Répétition Audio</h3>
+              <p className="text-gray-600 text-sm">Écoutez et répétez des phrases de la vie courante pour améliorer votre prononciation.</p>
             </Link>
           </div>
         </div>
