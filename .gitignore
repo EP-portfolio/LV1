@@ -46,3 +46,10 @@ next-env.d.ts
 Fichiers_MD/
 *.md
 !README.md
+
+# Scripts de diagnostic et utilitaires (non nécessaires en production)
+scripts/check-database-connection.ts
+scripts/check-supabase-config.ts
+scripts/check-api-config.ts
+scripts/pre-deploy-check.ts
+scripts/delete-all-users.ts
