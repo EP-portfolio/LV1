@@ -45,3 +45,4 @@ next-env.d.ts
 # Fichiers de documentation Markdown
 Fichiers_MD/
 *.md
+!README.md
