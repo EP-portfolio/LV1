@@ -180,11 +180,11 @@ export default function AudioRepetitionExercise() {
     setPreloadProgress(0)
     
     try {
-      console.log('🔄 Début préchargement session (32 phrases)...')
+      console.log('🔄 Début préchargement session (5 phrases)...')
       
-      // 1. Charger 32 phrases
+      // 1. Charger 5 phrases
       const phrases: SocialPhrase[] = []
-      for (let i = 0; i < 32; i++) {
+      for (let i = 0; i < 5; i++) {
         const response = await fetch('/api/phrases/random', {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -196,7 +196,7 @@ export default function AudioRepetitionExercise() {
             phrases.push(data)
           }
         }
-        setPreloadProgress(Math.round((i + 1) / 32 * 30)) // 0-30%
+        setPreloadProgress(Math.round((i + 1) / 5 * 30)) // 0-30%
       }
       
       if (phrases.length === 0) {
@@ -907,7 +907,7 @@ export default function AudioRepetitionExercise() {
               Préchargement de la session...
             </h3>
             <p className="text-blue-700 text-sm mb-4">
-              Chargement de 32 phrases et leurs audios pour une expérience fluide
+              Chargement de 5 phrases et leurs audios pour une expérience fluide
             </p>
             <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
               <div 
