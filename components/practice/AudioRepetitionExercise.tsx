@@ -649,6 +649,7 @@ export default function AudioRepetitionExercise() {
       console.error('Erreur dans le cycle préchargé:', error)
       setError(error instanceof Error ? error.message : 'Erreur lors de la lecture audio')
       setIsActive(false)
+      isActiveRef.current = false
       setPhase('idle')
     }
   }
