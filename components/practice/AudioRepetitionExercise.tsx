@@ -24,16 +24,32 @@ type Phase =
   | 'pause_5s'
   | 'playing_nouvelle_phrase'
 
+interface PreloadedAudio {
+  element: HTMLAudioElement
+  url: string
+  ready: boolean
+}
+
+interface PreloadedPhrase extends SocialPhrase {
+  audioFr: PreloadedAudio | null
+  audioEn: PreloadedAudio | null
+}
+
 export default function AudioRepetitionExercise() {
   const [phrase, setPhrase] = useState<SocialPhrase | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [isActive, setIsActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [nouvellePhraseUrl, setNouvellePhraseUrl] = useState<string | null>(null)
+  const [preloadedPhrases, setPreloadedPhrases] = useState<PreloadedPhrase[]>([])
+  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0)
+  const [isPreloading, setIsPreloading] = useState(false)
+  const [preloadProgress, setPreloadProgress] = useState(0)
   const audioRefFr = useRef<HTMLAudioElement | null>(null)
   const audioRefEn = useRef<HTMLAudioElement | null>(null)
   const audioRefNouvellePhrase = useRef<HTMLAudioElement | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const preloadedNouvellePhrase = useRef<PreloadedAudio | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -119,6 +135,183 @@ export default function AudioRepetitionExercise() {
     }
   }
 
+  // Précharger un audio
+  const preloadAudio = (url: string): Promise<PreloadedAudio> => {
+    return new Promise((resolve, reject) => {
+      if (!url) {
+        reject(new Error('URL audio manquante'))
+        return
+      }
+
+      const audio = new Audio(url)
+      audio.preload = 'auto'
+      
+      audio.oncanplaythrough = () => {
+        resolve({
+          element: audio,
+          url,
+          ready: true
+        })
+      }
+      
+      audio.onerror = (error) => {
+        console.error('Erreur préchargement audio:', error, url)
+        reject(new Error(`Impossible de précharger l'audio: ${url}`))
+      }
+      
+      // Timeout de sécurité
+      setTimeout(() => {
+        if (audio.readyState >= 2) {
+          resolve({
+            element: audio,
+            url,
+            ready: true
+          })
+        } else {
+          reject(new Error(`Timeout préchargement: ${url}`))
+        }
+      }, 10000)
+    })
+  }
+
+  // Précharger toutes les phrases et leurs audios
+  const preloadSession = async (): Promise<void> => {
+    setIsPreloading(true)
+    setPreloadProgress(0)
+    
+    try {
+      console.log('🔄 Début préchargement session (32 phrases)...')
+      
+      // 1. Charger 32 phrases
+      const phrases: SocialPhrase[] = []
+      for (let i = 0; i < 32; i++) {
+        const response = await fetch('/api/phrases/random', {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        })
+        
+        if (response.ok) {
+          const data: SocialPhrase = await response.json()
+          if (data.audioUrlFr && data.audioUrlEn) {
+            phrases.push(data)
+          }
+        }
+        setPreloadProgress(Math.round((i + 1) / 32 * 30)) // 0-30%
+      }
+      
+      if (phrases.length === 0) {
+        throw new Error('Aucune phrase avec audio disponible')
+      }
+      
+      console.log(`✅ ${phrases.length} phrases chargées, préchargement audios...`)
+      
+      // 2. Précharger tous les audios
+      const preloaded: PreloadedPhrase[] = []
+      const totalAudios = phrases.length * 2 + 1 // FR + EN pour chaque phrase + nouvelle phrase
+      let loadedCount = 0
+      
+      // Précharger "nouvelle phrase" en premier
+      if (nouvellePhraseUrl) {
+        try {
+          const nouvelleAudio = await preloadAudio(nouvellePhraseUrl)
+          preloadedNouvellePhrase.current = nouvelleAudio
+          loadedCount++
+          setPreloadProgress(30 + Math.round(loadedCount / totalAudios * 70))
+          console.log('✅ Audio "nouvelle phrase" préchargé')
+        } catch (error) {
+          console.warn('⚠️ Erreur préchargement "nouvelle phrase", fallback sera utilisé')
+        }
+      }
+      
+      // Précharger les audios de chaque phrase
+      for (let i = 0; i < phrases.length; i++) {
+        const phrase = phrases[i]
+        const preloadedPhrase: PreloadedPhrase = {
+          ...phrase,
+          audioFr: null,
+          audioEn: null
+        }
+        
+        // Précharger audio FR
+        if (phrase.audioUrlFr) {
+          try {
+            const audioFr = await preloadAudio(phrase.audioUrlFr)
+            preloadedPhrase.audioFr = audioFr
+            loadedCount++
+            setPreloadProgress(30 + Math.round(loadedCount / totalAudios * 70))
+          } catch (error) {
+            console.warn(`⚠️ Erreur préchargement FR pour phrase ${i + 1}`)
+          }
+        }
+        
+        // Précharger audio EN
+        if (phrase.audioUrlEn) {
+          try {
+            const audioEn = await preloadAudio(phrase.audioUrlEn)
+            preloadedPhrase.audioEn = audioEn
+            loadedCount++
+            setPreloadProgress(30 + Math.round(loadedCount / totalAudios * 70))
+          } catch (error) {
+            console.warn(`⚠️ Erreur préchargement EN pour phrase ${i + 1}`)
+          }
+        }
+        
+        preloaded.push(preloadedPhrase)
+      }
+      
+      setPreloadedPhrases(preloaded)
+      setPreloadProgress(100)
+      console.log(`✅ Préchargement terminé: ${preloaded.length} phrases, ${loadedCount} audios`)
+      
+    } catch (error) {
+      console.error('❌ Erreur préchargement:', error)
+      setError(error instanceof Error ? error.message : 'Erreur lors du préchargement')
+    } finally {
+      setIsPreloading(false)
+    }
+  }
+
+  // Jouer un audio préchargé
+  const playPreloadedAudio = (preloadedAudio: PreloadedAudio | null): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!preloadedAudio || !preloadedAudio.ready) {
+        reject(new Error('Audio non préchargé'))
+        return
+      }
+
+      const audio = preloadedAudio.element
+      
+      // Réinitialiser la position si nécessaire
+      if (audio.currentTime > 0) {
+        audio.currentTime = 0
+      }
+      
+      let hasResolved = false
+      
+      audio.onended = () => {
+        if (!hasResolved) {
+          hasResolved = true
+          resolve()
+        }
+      }
+      
+      audio.onerror = () => {
+        if (!hasResolved) {
+          hasResolved = true
+          reject(new Error('Erreur lecture audio préchargé'))
+        }
+      }
+      
+      audio.play().catch((error) => {
+        if (!hasResolved) {
+          hasResolved = true
+          reject(error)
+        }
+      })
+    })
+  }
+
+  // Ancienne fonction playAudio (fallback si pas de préchargement)
   const playAudio = (url: string, language: 'fr' | 'en'): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (!url) {
@@ -127,8 +320,6 @@ export default function AudioRepetitionExercise() {
       }
 
       const audio = new Audio(url)
-      
-      // Précharger le fichier
       audio.preload = 'auto'
       
       if (language === 'fr') {
@@ -140,7 +331,6 @@ export default function AudioRepetitionExercise() {
       let hasResolved = false
       let hasRejected = false
 
-      // Gestion de la fin de lecture
       audio.onended = () => {
         if (!hasResolved) {
           hasResolved = true
@@ -149,7 +339,6 @@ export default function AudioRepetitionExercise() {
         }
       }
       
-      // Gestion des erreurs
       audio.onerror = (error) => {
         if (!hasRejected && !hasResolved) {
           hasRejected = true
@@ -158,7 +347,6 @@ export default function AudioRepetitionExercise() {
         }
       }
       
-      // Fonction pour démarrer la lecture
       const startPlayback = async () => {
         if (hasResolved || hasRejected) return
         
@@ -175,11 +363,9 @@ export default function AudioRepetitionExercise() {
         }
       }
 
-      // Si le fichier est déjà suffisamment chargé, jouer immédiatement
       if (audio.readyState >= 2) {
         startPlayback()
       } else {
-        // Attendre que le fichier soit chargé
         audio.oncanplay = () => {
           if (!hasResolved && !hasRejected) {
             startPlayback()
@@ -192,7 +378,6 @@ export default function AudioRepetitionExercise() {
           }
         }
         
-        // Timeout de sécurité (5 secondes)
         setTimeout(() => {
           if (!hasResolved && !hasRejected) {
             if (audio.readyState >= 2) {
@@ -208,9 +393,43 @@ export default function AudioRepetitionExercise() {
   }
 
   const playNouvellePhrase = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      // Utiliser le fichier audio pré-généré si disponible
-      if (nouvellePhraseUrl) {
+    return new Promise((resolve) => {
+      // Utiliser l'audio préchargé si disponible
+      if (preloadedNouvellePhrase.current && preloadedNouvellePhrase.current.ready) {
+        console.log('🔄 Lecture "nouvelle phrase" (préchargé)')
+        const audio = preloadedNouvellePhrase.current.element
+        audioRefNouvellePhrase.current = audio
+        
+        // Réinitialiser la position
+        if (audio.currentTime > 0) {
+          audio.currentTime = 0
+        }
+        
+        let hasResolved = false
+        
+        audio.onended = () => {
+          if (!hasResolved) {
+            hasResolved = true
+            console.log('✅ "Nouvelle phrase" terminée')
+            resolve()
+          }
+        }
+        
+        audio.onerror = () => {
+          if (!hasResolved) {
+            console.warn('⚠️ Erreur lecture "nouvelle phrase" préchargé, fallback')
+            playNouvellePhraseFallback(resolve)
+          }
+        }
+        
+        audio.play().catch(() => {
+          if (!hasResolved) {
+            playNouvellePhraseFallback(resolve)
+          }
+        })
+      } else if (nouvellePhraseUrl) {
+        // Fallback : charger à la volée si pas préchargé
+        console.log('🔄 Lecture "nouvelle phrase" (chargement à la volée)')
         const audio = new Audio(nouvellePhraseUrl)
         audioRefNouvellePhrase.current = audio
         audio.preload = 'auto'
@@ -220,23 +439,20 @@ export default function AudioRepetitionExercise() {
         audio.onended = () => {
           if (!hasResolved) {
             hasResolved = true
+            console.log('✅ "Nouvelle phrase" terminée')
             resolve()
           }
         }
         
         audio.onerror = () => {
           if (!hasResolved) {
-            // Fallback sur Web Speech API si erreur
             playNouvellePhraseFallback(resolve)
           }
         }
         
-        // Attendre que le fichier soit prêt
         const tryPlay = () => {
           if (hasResolved) return
-          
           audio.play().catch(() => {
-            // Fallback sur Web Speech API si erreur de lecture
             if (!hasResolved) {
               playNouvellePhraseFallback(resolve)
             }
@@ -249,15 +465,16 @@ export default function AudioRepetitionExercise() {
           audio.oncanplaythrough = () => {
             tryPlay()
           }
-          // Timeout de sécurité
           setTimeout(() => {
             if (!hasResolved && audio.readyState >= 2) {
               tryPlay()
+            } else if (!hasResolved) {
+              playNouvellePhraseFallback(resolve)
             }
           }, 5000)
         }
       } else {
-        // Fallback sur Web Speech API si URL non disponible
+        // Fallback final : Web Speech API
         playNouvellePhraseFallback(resolve)
       }
     })
@@ -277,9 +494,130 @@ export default function AudioRepetitionExercise() {
     }
   }
 
-  const startCycle = async (phraseToUse?: SocialPhrase | null) => {
-    // Utiliser la phrase passée en paramètre ou celle de l'état
-    const phraseToProcess = phraseToUse || phrase
+  // Cycle avec audios préchargés
+  const startCycleWithPreloaded = async (preloadedPhrase: PreloadedPhrase, index: number) => {
+    setIsActive(true)
+    
+    try {
+      // 1. Lecture audio français (préchargé)
+      setPhase('playing_fr')
+      console.log('🎵 Début cycle - Lecture audio FR (préchargé)')
+      await playPreloadedAudio(preloadedPhrase.audioFr)
+      console.log('✅ Audio FR terminé, passage à pause 2s')
+
+      // 2. Pause 2 secondes
+      setPhase('pause_2s')
+      await new Promise(resolve => {
+        timeoutRef.current = setTimeout(resolve, 2000)
+      })
+
+      // 3. Lecture audio anglais (première fois, préchargé)
+      setPhase('playing_en_1')
+      console.log('🎵 Lecture audio EN (1ère fois, préchargé)')
+      await playPreloadedAudio(preloadedPhrase.audioEn)
+      console.log('✅ Audio EN (1ère) terminé')
+
+      // 4. Pause 5 secondes
+      setPhase('pause_10s_1')
+      await new Promise(resolve => {
+        timeoutRef.current = setTimeout(resolve, 5000)
+      })
+
+      // 5. Lecture audio anglais (deuxième fois, préchargé)
+      setPhase('playing_en_2')
+      console.log('🎵 Lecture audio EN (2ème fois, préchargé)')
+      await playPreloadedAudio(preloadedPhrase.audioEn)
+      console.log('✅ Audio EN (2ème) terminé')
+
+      // 6. Pause 10 secondes
+      console.log('⏸️ Début pause 10s (2ème répétition)')
+      setPhase('pause_10s_2')
+      await new Promise(resolve => {
+        timeoutRef.current = setTimeout(() => {
+          console.log('✅ Pause 10s terminée')
+          resolve(undefined)
+        }, 10000)
+      })
+
+      // 7. Pause 5 secondes
+      console.log('⏸️ Début pause 5s')
+      setPhase('pause_5s')
+      await new Promise(resolve => {
+        timeoutRef.current = setTimeout(() => {
+          console.log('✅ Pause 5s terminée')
+          resolve(undefined)
+        }, 5000)
+      })
+
+      // 8. Audio "nouvelle phrase" (préchargé)
+      console.log('🔄 Début lecture "nouvelle phrase" (préchargé)')
+      setPhase('playing_nouvelle_phrase')
+      await playNouvellePhrase()
+      console.log('✅ "Nouvelle phrase" terminée')
+
+      // 8b. Pause 2 secondes après "nouvelle phrase"
+      console.log('⏸️ Pause 2s après "nouvelle phrase"')
+      setPhase('pause_2s')
+      await new Promise(resolve => {
+        timeoutRef.current = setTimeout(() => {
+          console.log('✅ Pause 2s terminée, passage phrase suivante...')
+          resolve(undefined)
+        }, 2000)
+      })
+
+      // 9. Passer à la phrase suivante dans le pool préchargé
+      if (isActive && preloadedPhrases.length > 0) {
+        const nextIndex = (index + 1) % preloadedPhrases.length
+        setCurrentPhraseIndex(nextIndex)
+        
+        // Attendre un peu pour permettre la mise à jour de l'état
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
+        // Relancer le cycle avec la phrase suivante
+        if (isActive) {
+          console.log(`🔄 Relance cycle avec phrase ${nextIndex + 1}/${preloadedPhrases.length}`)
+          startCycle(undefined, nextIndex)
+        }
+      }
+    } catch (error) {
+      console.error('Erreur dans le cycle préchargé:', error)
+      setError(error instanceof Error ? error.message : 'Erreur lors de la lecture audio')
+      setIsActive(false)
+      setPhase('idle')
+    }
+  }
+
+  const startCycle = async (phraseToUse?: PreloadedPhrase | SocialPhrase | null, phraseIndex?: number) => {
+    // Utiliser les phrases préchargées si disponibles
+    if (preloadedPhrases.length > 0) {
+      const index = phraseIndex !== undefined ? phraseIndex : currentPhraseIndex
+      const preloadedPhrase = preloadedPhrases[index]
+      
+      if (!preloadedPhrase || !preloadedPhrase.audioFr || !preloadedPhrase.audioEn) {
+        console.error('❌ Phrase préchargée invalide ou audios manquants')
+        setError('Erreur: phrase ou audios non disponibles')
+        setIsActive(false)
+        setPhase('idle')
+        return
+      }
+      
+      // Mettre à jour l'état avec la phrase actuelle
+      setPhrase({
+        id: preloadedPhrase.id,
+        frenchPhrase: preloadedPhrase.frenchPhrase,
+        englishPhrase: preloadedPhrase.englishPhrase,
+        category: preloadedPhrase.category,
+        audioUrlFr: preloadedPhrase.audioUrlFr,
+        audioUrlEn: preloadedPhrase.audioUrlEn
+      })
+      
+      // Utiliser les audios préchargés
+      await startCycleWithPreloaded(preloadedPhrase, index)
+      return
+    }
+    
+    // Fallback : utiliser l'ancien système si pas de préchargement
+    const phraseToProcess = phraseToUse as SocialPhrase || phrase
     if (!phraseToProcess) return
 
     setIsActive(true)
@@ -442,8 +780,7 @@ export default function AudioRepetitionExercise() {
   }
 
   useEffect(() => {
-    loadPhrase()
-    // Charger l'URL de "nouvelle phrase"
+    // Charger l'URL de "nouvelle phrase" puis lancer le préchargement
     fetch('/api/audio/nouvelle-phrase')
       .then(res => {
         if (!res.ok) {
@@ -459,10 +796,13 @@ export default function AudioRepetitionExercise() {
         } else {
           console.warn('⚠️ Pas d\'URL retournée pour "nouvelle phrase", utilisation du fallback Web Speech API')
         }
+        // Lancer le préchargement après avoir chargé l'URL de "nouvelle phrase"
+        preloadSession()
       })
       .catch(err => {
         console.error('❌ Erreur chargement audio nouvelle phrase:', err)
-        // Le fallback Web Speech API sera utilisé dans playNouvellePhrase
+        // Lancer le préchargement quand même
+        preloadSession()
       })
   }, [])
 
@@ -530,6 +870,37 @@ export default function AudioRepetitionExercise() {
           Écoutez la phrase en français, puis répétez-la en anglais après chaque écoute.
         </p>
 
+        {/* Affichage progression préchargement */}
+        {isPreloading && (
+          <div className="mb-6 bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">
+              Préchargement de la session...
+            </h3>
+            <p className="text-blue-700 text-sm mb-4">
+              Chargement de 32 phrases et leurs audios pour une expérience fluide
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+              <div 
+                className="bg-blue-600 h-4 rounded-full transition-all duration-300"
+                style={{ width: `${preloadProgress}%` }}
+              />
+            </div>
+            <p className="text-center text-sm text-blue-700 font-medium">
+              {preloadProgress}%
+            </p>
+          </div>
+        )}
+
+        {/* Affichage phrase actuelle (si préchargement terminé) */}
+        {!isPreloading && preloadedPhrases.length > 0 && (
+          <div className="mb-4 bg-green-50 border-2 border-green-200 rounded-lg p-4">
+            <p className="text-sm text-green-800">
+              ✅ Session préchargée : {preloadedPhrases.length} phrases prêtes
+              {currentPhraseIndex > 0 && ` (Phrase ${currentPhraseIndex + 1}/${preloadedPhrases.length})`}
+            </p>
+          </div>
+        )}
+
         {phrase && (
           <div className="mb-6">
             <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-4">
@@ -564,10 +935,16 @@ export default function AudioRepetitionExercise() {
           {!isActive ? (
             <button
               onClick={() => startCycle()}
-              disabled={!phrase || phase === 'loading'}
+              disabled={isPreloading || (preloadedPhrases.length === 0 && (!phrase || phase === 'loading'))}
               className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md hover:shadow-lg transition-all"
             >
-              {phase === 'loading' ? 'Chargement...' : 'Commencer'}
+              {isPreloading 
+                ? `Préchargement... ${preloadProgress}%` 
+                : phase === 'loading' 
+                  ? 'Chargement...' 
+                  : preloadedPhrases.length > 0 
+                    ? 'Commencer' 
+                    : 'Chargement...'}
             </button>
           ) : (
             <button
