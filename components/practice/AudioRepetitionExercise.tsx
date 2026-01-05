@@ -664,6 +664,7 @@ export default function AudioRepetitionExercise() {
         console.error('❌ Phrase préchargée invalide ou audios manquants')
         setError('Erreur: phrase ou audios non disponibles')
         setIsActive(false)
+        isActiveRef.current = false
         setPhase('idle')
         return
       }
@@ -711,6 +712,7 @@ export default function AudioRepetitionExercise() {
     if (!currentPhrase || !currentPhrase.audioUrlFr || !currentPhrase.audioUrlEn) {
       setError('Les fichiers audio ne sont pas disponibles. Veuillez exécuter: npm run generate-audios')
       setIsActive(false)
+      isActiveRef.current = false
       setPhase('idle')
       return
     }
@@ -804,12 +806,14 @@ export default function AudioRepetitionExercise() {
           console.error('❌ Fichiers audio manquants pour la nouvelle phrase')
           setError('Les fichiers audio ne sont pas disponibles pour cette phrase.')
           setIsActive(false)
+          isActiveRef.current = false
           setPhase('idle')
         } else if (isActive) {
           // Erreur lors du chargement de la phrase
           console.error('❌ Erreur chargement nouvelle phrase')
           setError('Erreur lors du chargement de la nouvelle phrase.')
           setIsActive(false)
+          isActiveRef.current = false
           setPhase('idle')
         } else {
           console.log('⚠️ Cycle arrêté (isActive = false)')
