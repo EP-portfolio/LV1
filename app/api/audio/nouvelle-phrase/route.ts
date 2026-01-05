@@ -14,14 +14,28 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
  */
 export async function GET() {
   try {
+    // Vérifier les variables d'environnement
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Variables d\'environnement Supabase manquantes')
+      return NextResponse.json(
+        { error: 'Configuration serveur incomplète' },
+        { status: 500 }
+      )
+    }
+
     const filePath = 'audio/shared/nouvelle_phrase.mp3'
     
     // Vérifier si le fichier existe déjà
-    const { data: existingFiles } = await supabase.storage
+    const { data: existingFiles, error: listError } = await supabase.storage
       .from('practice-media')
       .list('audio/shared', {
         search: 'nouvelle_phrase.mp3'
       })
+
+    if (listError) {
+      console.error('Erreur liste fichiers:', listError)
+      // Continuer quand même pour générer le fichier
+    }
 
     if (existingFiles && existingFiles.length > 0) {
       // Le fichier existe, retourner l'URL
@@ -36,15 +50,16 @@ export async function GET() {
     const audioBuffer = await generateSpeech('nouvelle phrase', 'fr')
     
     // Upload dans Supabase Storage
-    const { error } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('practice-media')
       .upload(filePath, audioBuffer, {
         contentType: 'audio/mpeg',
         upsert: true,
       })
 
-    if (error) {
-      throw new Error(`Erreur upload: ${error.message}`)
+    if (uploadError) {
+      console.error('Erreur upload:', uploadError)
+      throw new Error(`Erreur upload: ${uploadError.message}`)
     }
 
     // Obtenir l'URL publique
