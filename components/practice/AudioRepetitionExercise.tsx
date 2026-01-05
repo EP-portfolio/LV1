@@ -601,7 +601,11 @@ export default function AudioRepetitionExercise() {
       // Utiliser le pool passé en paramètre pour éviter les problèmes de closure
       const currentPool = phrasesPool.length > 0 ? phrasesPool : preloadedPhrases
       
-      if (isActive && currentPool.length > 0) {
+      // Vérifier avec la ref pour éviter les problèmes de closure
+      const stillActive = isActiveRef.current
+      console.log(`🔍 Vérification relance: isActive=${isActive}, isActiveRef=${stillActive}, pool=${currentPool.length}`)
+      
+      if (stillActive && currentPool.length > 0) {
         const nextIndex = (index + 1) % currentPool.length
         console.log(`🔄 Passage à la phrase suivante: index ${nextIndex} (${nextIndex + 1}/${currentPool.length})`)
         setCurrentPhraseIndex(nextIndex)
