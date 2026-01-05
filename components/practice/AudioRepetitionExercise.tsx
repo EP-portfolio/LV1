@@ -414,13 +414,25 @@ export default function AudioRepetitionExercise() {
     loadPhrase()
     // Charger l'URL de "nouvelle phrase"
     fetch('/api/audio/nouvelle-phrase')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) {
+          console.warn(`⚠️ Route /api/audio/nouvelle-phrase retourne ${res.status}`)
+          return null
+        }
+        return res.json()
+      })
       .then(data => {
-        if (data.url) {
+        if (data && data.url) {
           setNouvellePhraseUrl(data.url)
+          console.log('✅ Audio "nouvelle phrase" chargé:', data.url)
+        } else {
+          console.warn('⚠️ Pas d\'URL retournée pour "nouvelle phrase", utilisation du fallback Web Speech API')
         }
       })
-      .catch(err => console.error('Erreur chargement audio nouvelle phrase:', err))
+      .catch(err => {
+        console.error('❌ Erreur chargement audio nouvelle phrase:', err)
+        // Le fallback Web Speech API sera utilisé dans playNouvellePhrase
+      })
   }, [])
 
   const getPhaseText = (): string => {
@@ -520,7 +532,7 @@ export default function AudioRepetitionExercise() {
         <div className="flex gap-4">
           {!isActive ? (
             <button
-              onClick={startCycle}
+              onClick={() => startCycle()}
               disabled={!phrase || phase === 'loading'}
               className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md hover:shadow-lg transition-all"
             >
