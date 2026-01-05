@@ -144,6 +144,7 @@ export default function AudioRepetitionExercise() {
       audio.onended = () => {
         if (!hasResolved) {
           hasResolved = true
+          console.log(`✅ Audio ${language} terminé`)
           resolve()
         }
       }
@@ -152,47 +153,56 @@ export default function AudioRepetitionExercise() {
       audio.onerror = (error) => {
         if (!hasRejected && !hasResolved) {
           hasRejected = true
-          console.error(`Erreur lecture audio ${language}:`, error, url)
+          console.error(`❌ Erreur lecture audio ${language}:`, error, url)
           reject(new Error(`Impossible de lire le fichier audio ${language}. Vérifiez que le fichier est accessible.`))
         }
       }
       
-      // Attendre que le fichier soit prêt avant de jouer
-      const tryPlay = () => {
+      // Fonction pour démarrer la lecture
+      const startPlayback = async () => {
         if (hasResolved || hasRejected) return
         
-        const playPromise = audio.play()
-        
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              // La lecture a démarré avec succès
-            })
-            .catch((error) => {
-              if (!hasRejected && !hasResolved) {
-                hasRejected = true
-                console.error(`Erreur lors de la lecture:`, error)
-                reject(new Error(`Impossible de démarrer la lecture audio ${language}. Assurez-vous d'avoir cliqué sur "Commencer".`))
-              }
-            })
+        try {
+          console.log(`▶️ Démarrage lecture audio ${language}...`)
+          await audio.play()
+          console.log(`✅ Lecture audio ${language} démarrée`)
+        } catch (error: any) {
+          if (!hasRejected && !hasResolved) {
+            hasRejected = true
+            console.error(`❌ Erreur démarrage lecture ${language}:`, error)
+            reject(new Error(`Impossible de démarrer la lecture audio ${language}. ${error.message || 'Assurez-vous d\'avoir cliqué sur "Commencer".'}`))
+          }
         }
       }
 
-      // Si le fichier est déjà chargé, jouer immédiatement
-      if (audio.readyState >= 3) {
-        tryPlay()
+      // Si le fichier est déjà suffisamment chargé, jouer immédiatement
+      if (audio.readyState >= 2) {
+        startPlayback()
       } else {
-        // Sinon, attendre que le fichier soit chargé
-        audio.oncanplaythrough = () => {
-          tryPlay()
+        // Attendre que le fichier soit chargé
+        audio.oncanplay = () => {
+          if (!hasResolved && !hasRejected) {
+            startPlayback()
+          }
         }
         
-        // Timeout de sécurité (10 secondes)
-        setTimeout(() => {
-          if (!hasResolved && !hasRejected && audio.readyState >= 2) {
-            tryPlay()
+        audio.oncanplaythrough = () => {
+          if (!hasResolved && !hasRejected && audio.paused) {
+            startPlayback()
           }
-        }, 10000)
+        }
+        
+        // Timeout de sécurité (5 secondes)
+        setTimeout(() => {
+          if (!hasResolved && !hasRejected) {
+            if (audio.readyState >= 2) {
+              startPlayback()
+            } else {
+              hasRejected = true
+              reject(new Error(`Timeout: Le fichier audio ${language} n'a pas pu être chargé à temps.`))
+            }
+          }
+        }, 5000)
       }
     })
   }
