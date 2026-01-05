@@ -643,7 +643,8 @@ export default function AudioRepetitionExercise() {
           setPhase('idle')
         }
       } else {
-        console.log(`⚠️ Pas de phrases préchargées (pool: ${currentPool.length}) ou cycle arrêté (isActive: ${isActive}, ref: ${stillActive})`)
+        const stillActiveCheck = isActiveRef.current
+        console.log(`⚠️ Pas de phrases préchargées (pool: ${currentPool.length}) ou cycle arrêté (isActive: ${isActive}, ref: ${stillActiveCheck})`)
       }
     } catch (error) {
       console.error('Erreur dans le cycle préchargé:', error)
