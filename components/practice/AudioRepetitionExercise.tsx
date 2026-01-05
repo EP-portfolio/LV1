@@ -54,7 +54,7 @@ export default function AudioRepetitionExercise() {
     }
   }, [])
 
-  const loadPhrase = async () => {
+  const loadPhrase = async (): Promise<SocialPhrase | null> => {
     try {
       setPhase('loading')
       const response = await fetch('/api/phrases/random', {
@@ -65,7 +65,7 @@ export default function AudioRepetitionExercise() {
       if (!response.ok) {
         if (response.status === 401) {
           router.push('/login')
-          return
+          return null
         }
         
         const errorData = await response.json().catch(() => ({ error: 'Erreur inconnue' }))
@@ -82,11 +82,13 @@ export default function AudioRepetitionExercise() {
       setPhrase(data)
       setError(null)
       setPhase('idle')
+      return data
     } catch (error) {
       console.error('Erreur:', error)
       const errorMessage = error instanceof Error ? error.message : 'Erreur lors du chargement'
       setError(errorMessage)
       setPhase('idle')
+      return null
     }
   }
 
@@ -265,13 +267,15 @@ export default function AudioRepetitionExercise() {
     }
   }
 
-  const startCycle = async () => {
-    if (!phrase) return
+  const startCycle = async (phraseToUse?: SocialPhrase | null) => {
+    // Utiliser la phrase passée en paramètre ou celle de l'état
+    const phraseToProcess = phraseToUse || phrase
+    if (!phraseToProcess) return
 
     setIsActive(true)
 
     // Vérifier que les fichiers audio sont disponibles (pré-générés)
-    let currentPhrase = phrase
+    let currentPhrase = phraseToProcess
     if (!currentPhrase.audioUrlFr || !currentPhrase.audioUrlEn) {
       // Si les fichiers ne sont pas présents, essayer de les générer (fallback)
       console.warn('⚠️ Fichiers audio manquants, tentative de génération...')
@@ -356,17 +360,22 @@ export default function AudioRepetitionExercise() {
 
       // 9. Charger une nouvelle phrase et recommencer
       if (isActive) {
-        await loadPhrase()
-        // Attendre un peu avant de recommencer pour permettre le chargement
-        await new Promise(resolve => setTimeout(resolve, 500))
-        // Vérifier à nouveau si toujours actif et si phrase chargée
-        if (isActive && phrase) {
-          // Utiliser setTimeout pour permettre à React de mettre à jour l'état
-          setTimeout(() => {
-            if (isActive && phrase) {
-              startCycle()
-            }
-          }, 200)
+        const newPhrase = await loadPhrase()
+        
+        // Vérifier à nouveau si toujours actif et si nouvelle phrase chargée
+        if (isActive && newPhrase && newPhrase.audioUrlFr && newPhrase.audioUrlEn) {
+          // Attendre un peu pour permettre la mise à jour de l'état React
+          await new Promise(resolve => setTimeout(resolve, 300))
+          
+          // Relancer le cycle avec la nouvelle phrase directement
+          if (isActive) {
+            startCycle(newPhrase)
+          }
+        } else if (isActive && newPhrase) {
+          // Phrase chargée mais fichiers audio manquants
+          setError('Les fichiers audio ne sont pas disponibles pour cette phrase.')
+          setIsActive(false)
+          setPhase('idle')
         }
       }
     } catch (error) {
