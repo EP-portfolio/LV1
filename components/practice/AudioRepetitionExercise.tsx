@@ -348,11 +348,17 @@ export default function AudioRepetitionExercise() {
       setPhase('playing_nouvelle_phrase')
       await playNouvellePhrase()
 
+      // 8b. Pause 2 secondes après "nouvelle phrase"
+      setPhase('pause_2s')
+      await new Promise(resolve => {
+        timeoutRef.current = setTimeout(resolve, 2000)
+      })
+
       // 9. Charger une nouvelle phrase et recommencer
       if (isActive) {
         await loadPhrase()
         // Attendre un peu avant de recommencer pour permettre le chargement
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 500))
         // Vérifier à nouveau si toujours actif et si phrase chargée
         if (isActive && phrase) {
           // Utiliser setTimeout pour permettre à React de mettre à jour l'état
