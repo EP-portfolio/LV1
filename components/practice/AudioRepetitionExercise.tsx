@@ -114,6 +114,11 @@ export default function AudioRepetitionExercise() {
 
   const playAudio = (url: string, language: 'fr' | 'en'): Promise<void> => {
     return new Promise((resolve, reject) => {
+      if (!url) {
+        reject(new Error('URL audio manquante'))
+        return
+      }
+
       const audio = new Audio(url)
       
       if (language === 'fr') {
@@ -122,9 +127,24 @@ export default function AudioRepetitionExercise() {
         audioRefEn.current = audio
       }
 
+      // Gestion des erreurs améliorée
       audio.onended = () => resolve()
-      audio.onerror = () => reject(new Error('Erreur lecture audio'))
-      audio.play()
+      audio.onerror = (error) => {
+        console.error(`Erreur lecture audio ${language}:`, error, url)
+        reject(new Error(`Impossible de lire le fichier audio ${language}. Vérifiez que le fichier est accessible.`))
+      }
+      
+      // Gestion du chargement
+      audio.oncanplaythrough = () => {
+        audio.play().catch((error) => {
+          console.error(`Erreur lors de la lecture:`, error)
+          reject(new Error(`Impossible de démarrer la lecture audio ${language}`))
+        })
+      }
+      
+      audio.onloadstart = () => {
+        // Le chargement a commencé
+      }
     })
   }
 
@@ -149,9 +169,11 @@ export default function AudioRepetitionExercise() {
 
     setIsActive(true)
 
-    // Générer les audios si nécessaire
+    // Vérifier que les fichiers audio sont disponibles (pré-générés)
     let currentPhrase = phrase
     if (!currentPhrase.audioUrlFr || !currentPhrase.audioUrlEn) {
+      // Si les fichiers ne sont pas présents, essayer de les générer (fallback)
+      console.warn('⚠️ Fichiers audio manquants, tentative de génération...')
       await generateAudios()
       // Recharger la phrase pour avoir les URLs
       const response = await fetch('/api/phrases/random', {
@@ -165,14 +187,18 @@ export default function AudioRepetitionExercise() {
       }
     }
 
-    if (!currentPhrase) return
+    // Vérifier à nouveau après tentative de génération
+    if (!currentPhrase || !currentPhrase.audioUrlFr || !currentPhrase.audioUrlEn) {
+      setError('Les fichiers audio ne sont pas disponibles. Veuillez exécuter: npm run generate-audios')
+      setIsActive(false)
+      setPhase('idle')
+      return
+    }
 
     try {
       // 1. Lecture audio français
       setPhase('playing_fr')
-      if (currentPhrase.audioUrlFr) {
-        await playAudio(currentPhrase.audioUrlFr, 'fr')
-      }
+      await playAudio(currentPhrase.audioUrlFr, 'fr')
 
       // 2. Pause 2 secondes
       setPhase('pause_2s')
@@ -182,9 +208,7 @@ export default function AudioRepetitionExercise() {
 
       // 3. Lecture audio anglais (première fois)
       setPhase('playing_en_1')
-      if (currentPhrase.audioUrlEn) {
-        await playAudio(currentPhrase.audioUrlEn, 'en')
-      }
+      await playAudio(currentPhrase.audioUrlEn, 'en')
 
       // 4. Pause 10 secondes (utilisateur répète)
       setPhase('pause_10s_1')
@@ -194,9 +218,7 @@ export default function AudioRepetitionExercise() {
 
       // 5. Lecture audio anglais (deuxième fois)
       setPhase('playing_en_2')
-      if (currentPhrase.audioUrlEn) {
-        await playAudio(currentPhrase.audioUrlEn, 'en')
-      }
+      await playAudio(currentPhrase.audioUrlEn, 'en')
 
       // 6. Pause 10 secondes (utilisateur répète)
       setPhase('pause_10s_2')

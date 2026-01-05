@@ -1,13 +1,14 @@
 import { generateSpeechWithGoogle } from './google-tts'
 import { uploadAudio } from '@/lib/storage/upload'
 
-// Génération audio avec Google Cloud Text-to-Speech
+// Génération audio avec Google Cloud Text-to-Speech (Wavenet pour qualité naturelle)
 export async function generateSpeech(
   text: string,
   language: 'fr' | 'en',
   voiceIndex: number = 0
 ): Promise<Buffer> {
-  return generateSpeechWithGoogle(text, language, voiceIndex)
+  // Force l'utilisation de Wavenet pour une qualité naturelle et humaine optimale
+  return generateSpeechWithGoogle(text, language, voiceIndex, true)
 }
 
 // Sauvegarder l'audio et retourner l'URL

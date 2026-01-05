@@ -19,7 +19,10 @@
     "pre-deploy": "tsx scripts/pre-deploy-check.ts",
     "delete-users": "tsx scripts/delete-all-users.ts",
     "setup-storage": "tsx scripts/setup-supabase-storage.ts",
-    "test-gemini": "tsx scripts/test-gemini-models.ts"
+    "test-gemini": "tsx scripts/test-gemini-models.ts",
+    "test-tts": "tsx scripts/test-tts-api.ts",
+    "generate-audios": "tsx scripts/generate-all-phrase-audios.ts",
+    "check-audios": "tsx scripts/check-audio-status.ts"
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.4.0",
