@@ -126,6 +126,9 @@ export default function AudioRepetitionExercise() {
 
       const audio = new Audio(url)
       
+      // Précharger le fichier
+      audio.preload = 'auto'
+      
       if (language === 'fr') {
         audioRefFr.current = audio
       } else {
@@ -152,21 +155,42 @@ export default function AudioRepetitionExercise() {
         }
       }
       
-      // Démarrer la lecture
-      const playPromise = audio.play()
-      
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            // La lecture a démarré avec succès
-          })
-          .catch((error) => {
-            if (!hasRejected && !hasResolved) {
-              hasRejected = true
-              console.error(`Erreur lors de la lecture:`, error)
-              reject(new Error(`Impossible de démarrer la lecture audio ${language}`))
-            }
-          })
+      // Attendre que le fichier soit prêt avant de jouer
+      const tryPlay = () => {
+        if (hasResolved || hasRejected) return
+        
+        const playPromise = audio.play()
+        
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              // La lecture a démarré avec succès
+            })
+            .catch((error) => {
+              if (!hasRejected && !hasResolved) {
+                hasRejected = true
+                console.error(`Erreur lors de la lecture:`, error)
+                reject(new Error(`Impossible de démarrer la lecture audio ${language}. Assurez-vous d'avoir cliqué sur "Commencer".`))
+              }
+            })
+        }
+      }
+
+      // Si le fichier est déjà chargé, jouer immédiatement
+      if (audio.readyState >= 3) {
+        tryPlay()
+      } else {
+        // Sinon, attendre que le fichier soit chargé
+        audio.oncanplaythrough = () => {
+          tryPlay()
+        }
+        
+        // Timeout de sécurité (10 secondes)
+        setTimeout(() => {
+          if (!hasResolved && !hasRejected && audio.readyState >= 2) {
+            tryPlay()
+          }
+        }, 10000)
       }
     })
   }
@@ -177,17 +201,49 @@ export default function AudioRepetitionExercise() {
       if (nouvellePhraseUrl) {
         const audio = new Audio(nouvellePhraseUrl)
         audioRefNouvellePhrase.current = audio
+        audio.preload = 'auto'
         
-        audio.onended = () => resolve()
-        audio.onerror = () => {
-          // Fallback sur Web Speech API si erreur
-          playNouvellePhraseFallback(resolve)
+        let hasResolved = false
+        
+        audio.onended = () => {
+          if (!hasResolved) {
+            hasResolved = true
+            resolve()
+          }
         }
         
-        audio.play().catch(() => {
-          // Fallback sur Web Speech API si erreur de lecture
-          playNouvellePhraseFallback(resolve)
-        })
+        audio.onerror = () => {
+          if (!hasResolved) {
+            // Fallback sur Web Speech API si erreur
+            playNouvellePhraseFallback(resolve)
+          }
+        }
+        
+        // Attendre que le fichier soit prêt
+        const tryPlay = () => {
+          if (hasResolved) return
+          
+          audio.play().catch(() => {
+            // Fallback sur Web Speech API si erreur de lecture
+            if (!hasResolved) {
+              playNouvellePhraseFallback(resolve)
+            }
+          })
+        }
+        
+        if (audio.readyState >= 3) {
+          tryPlay()
+        } else {
+          audio.oncanplaythrough = () => {
+            tryPlay()
+          }
+          // Timeout de sécurité
+          setTimeout(() => {
+            if (!hasResolved && audio.readyState >= 2) {
+              tryPlay()
+            }
+          }, 5000)
+        }
       } else {
         // Fallback sur Web Speech API si URL non disponible
         playNouvellePhraseFallback(resolve)
@@ -241,6 +297,17 @@ export default function AudioRepetitionExercise() {
     }
 
     try {
+      // Précharger les fichiers audio pour éviter les problèmes de lecture
+      const preloadFr = new Audio(currentPhrase.audioUrlFr)
+      const preloadEn = new Audio(currentPhrase.audioUrlEn)
+      preloadFr.preload = 'auto'
+      preloadEn.preload = 'auto'
+      preloadFr.load()
+      preloadEn.load()
+
+      // Attendre un peu pour le préchargement
+      await new Promise(resolve => setTimeout(resolve, 300))
+
       // 1. Lecture audio français
       setPhase('playing_fr')
       await playAudio(currentPhrase.audioUrlFr, 'fr')
@@ -284,20 +351,21 @@ export default function AudioRepetitionExercise() {
       // 9. Charger une nouvelle phrase et recommencer
       if (isActive) {
         await loadPhrase()
-        // Attendre un peu avant de recommencer
-        await new Promise(resolve => setTimeout(resolve, 500))
+        // Attendre un peu avant de recommencer pour permettre le chargement
+        await new Promise(resolve => setTimeout(resolve, 1000))
         // Vérifier à nouveau si toujours actif et si phrase chargée
-        if (isActive) {
+        if (isActive && phrase) {
           // Utiliser setTimeout pour permettre à React de mettre à jour l'état
           setTimeout(() => {
             if (isActive && phrase) {
               startCycle()
             }
-          }, 100)
+          }, 200)
         }
       }
     } catch (error) {
       console.error('Erreur dans le cycle:', error)
+      setError(error instanceof Error ? error.message : 'Erreur lors de la lecture audio')
       setPhase('idle')
       setIsActive(false)
     }
