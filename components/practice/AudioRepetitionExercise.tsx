@@ -525,7 +525,7 @@ export default function AudioRepetitionExercise() {
   }
 
   // Cycle avec audios préchargés
-  const startCycleWithPreloaded = async (preloadedPhrase: PreloadedPhrase, index: number) => {
+  const startCycleWithPreloaded = async (preloadedPhrase: PreloadedPhrase, index: number, phrasesPool: PreloadedPhrase[]) => {
     setIsActive(true)
     
     try {
@@ -596,14 +596,17 @@ export default function AudioRepetitionExercise() {
       })
 
       // 9. Passer à la phrase suivante dans le pool préchargé
-      if (isActive && preloadedPhrases.length > 0) {
-        const nextIndex = (index + 1) % preloadedPhrases.length
-        console.log(`🔄 Passage à la phrase suivante: index ${nextIndex} (${nextIndex + 1}/${preloadedPhrases.length})`)
+      // Utiliser le pool passé en paramètre pour éviter les problèmes de closure
+      const currentPool = phrasesPool.length > 0 ? phrasesPool : preloadedPhrases
+      
+      if (isActive && currentPool.length > 0) {
+        const nextIndex = (index + 1) % currentPool.length
+        console.log(`🔄 Passage à la phrase suivante: index ${nextIndex} (${nextIndex + 1}/${currentPool.length})`)
         setCurrentPhraseIndex(nextIndex)
         
         // Mettre à jour la phrase affichée immédiatement
-        const nextPhrase = preloadedPhrases[nextIndex]
-        if (nextPhrase) {
+        const nextPhrase = currentPool[nextIndex]
+        if (nextPhrase && nextPhrase.audioFr && nextPhrase.audioEn) {
           setPhrase({
             id: nextPhrase.id,
             frenchPhrase: nextPhrase.frenchPhrase,
@@ -612,25 +615,30 @@ export default function AudioRepetitionExercise() {
             audioUrlFr: nextPhrase.audioUrlFr,
             audioUrlEn: nextPhrase.audioUrlEn
           })
-        }
-        
-        // Attendre un peu pour permettre la mise à jour de l'état
-        await new Promise(resolve => setTimeout(resolve, 300))
-        
-        // Relancer le cycle avec la phrase suivante
-        if (isActive) {
-          console.log(`🔄 Relance cycle avec phrase ${nextIndex + 1}/${preloadedPhrases.length}`)
-          // Utiliser setTimeout pour éviter les problèmes de stack
-          setTimeout(() => {
-            if (isActive) {
-              startCycle(undefined, nextIndex)
-            }
-          }, 100)
+          
+          // Attendre un peu pour permettre la mise à jour de l'état
+          await new Promise(resolve => setTimeout(resolve, 300))
+          
+          // Relancer le cycle avec la phrase suivante directement
+          if (isActive) {
+            console.log(`🔄 Relance cycle avec phrase ${nextIndex + 1}/${currentPool.length}`)
+            // Appeler directement startCycleWithPreloaded pour éviter les problèmes de state
+            setTimeout(() => {
+              if (isActive) {
+                startCycleWithPreloaded(nextPhrase, nextIndex, currentPool)
+              }
+            }, 100)
+          } else {
+            console.log('⚠️ Cycle arrêté, ne pas relancer')
+          }
         } else {
-          console.log('⚠️ Cycle arrêté, ne pas relancer')
+          console.error('❌ Phrase suivante invalide ou audios manquants')
+          setError('Erreur: phrase ou audios non disponibles')
+          setIsActive(false)
+          setPhase('idle')
         }
       } else {
-        console.log('⚠️ Pas de phrases préchargées ou cycle arrêté')
+        console.log(`⚠️ Pas de phrases préchargées (pool: ${currentPool.length}) ou cycle arrêté (isActive: ${isActive})`)
       }
     } catch (error) {
       console.error('Erreur dans le cycle préchargé:', error)
@@ -664,8 +672,8 @@ export default function AudioRepetitionExercise() {
         audioUrlEn: preloadedPhrase.audioUrlEn
       })
       
-      // Utiliser les audios préchargés
-      await startCycleWithPreloaded(preloadedPhrase, index)
+      // Utiliser les audios préchargés (passer le pool complet pour éviter les problèmes de closure)
+      await startCycleWithPreloaded(preloadedPhrase, index, preloadedPhrases)
       return
     }
     
@@ -884,7 +892,8 @@ export default function AudioRepetitionExercise() {
     }
   }
 
-  if (!phrase && phase !== 'loading') {
+  // Ne pas afficher l'erreur pendant le préchargement
+  if (!phrase && phase !== 'loading' && !isPreloading && preloadedPhrases.length === 0) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6 max-w-2xl">
