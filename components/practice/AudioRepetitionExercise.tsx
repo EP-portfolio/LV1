@@ -29,8 +29,10 @@ export default function AudioRepetitionExercise() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [isActive, setIsActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [nouvellePhraseUrl, setNouvellePhraseUrl] = useState<string | null>(null)
   const audioRefFr = useRef<HTMLAudioElement | null>(null)
   const audioRefEn = useRef<HTMLAudioElement | null>(null)
+  const audioRefNouvellePhrase = useRef<HTMLAudioElement | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const router = useRouter()
 
@@ -45,6 +47,9 @@ export default function AudioRepetitionExercise() {
       }
       if (audioRefEn.current) {
         audioRefEn.current.pause()
+      }
+      if (audioRefNouvellePhrase.current) {
+        audioRefNouvellePhrase.current.pause()
       }
     }
   }, [])
@@ -127,41 +132,81 @@ export default function AudioRepetitionExercise() {
         audioRefEn.current = audio
       }
 
-      // Gestion des erreurs améliorée
-      audio.onended = () => resolve()
+      let hasResolved = false
+      let hasRejected = false
+
+      // Gestion de la fin de lecture
+      audio.onended = () => {
+        if (!hasResolved) {
+          hasResolved = true
+          resolve()
+        }
+      }
+      
+      // Gestion des erreurs
       audio.onerror = (error) => {
-        console.error(`Erreur lecture audio ${language}:`, error, url)
-        reject(new Error(`Impossible de lire le fichier audio ${language}. Vérifiez que le fichier est accessible.`))
+        if (!hasRejected && !hasResolved) {
+          hasRejected = true
+          console.error(`Erreur lecture audio ${language}:`, error, url)
+          reject(new Error(`Impossible de lire le fichier audio ${language}. Vérifiez que le fichier est accessible.`))
+        }
       }
       
-      // Gestion du chargement
-      audio.oncanplaythrough = () => {
-        audio.play().catch((error) => {
-          console.error(`Erreur lors de la lecture:`, error)
-          reject(new Error(`Impossible de démarrer la lecture audio ${language}`))
-        })
-      }
+      // Démarrer la lecture
+      const playPromise = audio.play()
       
-      audio.onloadstart = () => {
-        // Le chargement a commencé
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            // La lecture a démarré avec succès
+          })
+          .catch((error) => {
+            if (!hasRejected && !hasResolved) {
+              hasRejected = true
+              console.error(`Erreur lors de la lecture:`, error)
+              reject(new Error(`Impossible de démarrer la lecture audio ${language}`))
+            }
+          })
       }
     })
   }
 
   const playNouvellePhrase = (): Promise<void> => {
-    return new Promise((resolve) => {
-      // Générer l'audio "nouvelle phrase" avec Web Speech API
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance('nouvelle phrase')
-        utterance.lang = 'fr-FR'
-        utterance.rate = 0.8
-        utterance.onend = () => resolve()
-        window.speechSynthesis.speak(utterance)
+    return new Promise((resolve, reject) => {
+      // Utiliser le fichier audio pré-généré si disponible
+      if (nouvellePhraseUrl) {
+        const audio = new Audio(nouvellePhraseUrl)
+        audioRefNouvellePhrase.current = audio
+        
+        audio.onended = () => resolve()
+        audio.onerror = () => {
+          // Fallback sur Web Speech API si erreur
+          playNouvellePhraseFallback(resolve)
+        }
+        
+        audio.play().catch(() => {
+          // Fallback sur Web Speech API si erreur de lecture
+          playNouvellePhraseFallback(resolve)
+        })
       } else {
-        // Fallback : attendre 1 seconde
-        setTimeout(() => resolve(), 1000)
+        // Fallback sur Web Speech API si URL non disponible
+        playNouvellePhraseFallback(resolve)
       }
     })
+  }
+
+  const playNouvellePhraseFallback = (resolve: () => void) => {
+    // Générer l'audio "nouvelle phrase" avec Web Speech API
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance('nouvelle phrase')
+      utterance.lang = 'fr-FR'
+      utterance.rate = 0.8
+      utterance.onend = () => resolve()
+      window.speechSynthesis.speak(utterance)
+    } else {
+      // Fallback final : attendre 1 seconde
+      setTimeout(() => resolve(), 1000)
+    }
   }
 
   const startCycle = async () => {
@@ -210,17 +255,17 @@ export default function AudioRepetitionExercise() {
       setPhase('playing_en_1')
       await playAudio(currentPhrase.audioUrlEn, 'en')
 
-      // 4. Pause 10 secondes (utilisateur répète)
+      // 4. Pause 5 secondes (utilisateur répète après première lecture)
       setPhase('pause_10s_1')
       await new Promise(resolve => {
-        timeoutRef.current = setTimeout(resolve, 10000)
+        timeoutRef.current = setTimeout(resolve, 5000)
       })
 
       // 5. Lecture audio anglais (deuxième fois)
       setPhase('playing_en_2')
       await playAudio(currentPhrase.audioUrlEn, 'en')
 
-      // 6. Pause 10 secondes (utilisateur répète)
+      // 6. Pause 10 secondes (utilisateur répète après deuxième lecture)
       setPhase('pause_10s_2')
       await new Promise(resolve => {
         timeoutRef.current = setTimeout(resolve, 10000)
@@ -273,10 +318,23 @@ export default function AudioRepetitionExercise() {
       audioRefEn.current.pause()
       audioRefEn.current = null
     }
+    if (audioRefNouvellePhrase.current) {
+      audioRefNouvellePhrase.current.pause()
+      audioRefNouvellePhrase.current = null
+    }
   }
 
   useEffect(() => {
     loadPhrase()
+    // Charger l'URL de "nouvelle phrase"
+    fetch('/api/audio/nouvelle-phrase')
+      .then(res => res.json())
+      .then(data => {
+        if (data.url) {
+          setNouvellePhraseUrl(data.url)
+        }
+      })
+      .catch(err => console.error('Erreur chargement audio nouvelle phrase:', err))
   }, [])
 
   const getPhaseText = (): string => {
@@ -290,7 +348,7 @@ export default function AudioRepetitionExercise() {
       case 'playing_en_1':
         return '🎧 Écoutez la phrase en anglais'
       case 'pause_10s_1':
-        return '🎤 Répétez la phrase en anglais (10 secondes)'
+        return '🎤 Répétez la phrase en anglais (5 secondes)'
       case 'playing_en_2':
         return '🎧 Écoutez à nouveau la phrase en anglais'
       case 'pause_10s_2':
