@@ -279,6 +279,20 @@ export default function AudioRepetitionExercise() {
       setPreloadProgress(100)
       console.log(`✅ Préchargement terminé: ${preloaded.length} phrases, ${loadedCount} audios`)
       
+      // Initialiser la première phrase pour l'affichage
+      if (preloaded.length > 0) {
+        const firstPhrase = preloaded[0]
+        setPhrase({
+          id: firstPhrase.id,
+          frenchPhrase: firstPhrase.frenchPhrase,
+          englishPhrase: firstPhrase.englishPhrase,
+          category: firstPhrase.category,
+          audioUrlFr: firstPhrase.audioUrlFr,
+          audioUrlEn: firstPhrase.audioUrlEn
+        })
+        setCurrentPhraseIndex(0)
+      }
+      
     } catch (error) {
       console.error('❌ Erreur préchargement:', error)
       setError(error instanceof Error ? error.message : 'Erreur lors du préchargement')
