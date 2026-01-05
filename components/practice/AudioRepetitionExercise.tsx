@@ -598,7 +598,21 @@ export default function AudioRepetitionExercise() {
       // 9. Passer à la phrase suivante dans le pool préchargé
       if (isActive && preloadedPhrases.length > 0) {
         const nextIndex = (index + 1) % preloadedPhrases.length
+        console.log(`🔄 Passage à la phrase suivante: index ${nextIndex} (${nextIndex + 1}/${preloadedPhrases.length})`)
         setCurrentPhraseIndex(nextIndex)
+        
+        // Mettre à jour la phrase affichée immédiatement
+        const nextPhrase = preloadedPhrases[nextIndex]
+        if (nextPhrase) {
+          setPhrase({
+            id: nextPhrase.id,
+            frenchPhrase: nextPhrase.frenchPhrase,
+            englishPhrase: nextPhrase.englishPhrase,
+            category: nextPhrase.category,
+            audioUrlFr: nextPhrase.audioUrlFr,
+            audioUrlEn: nextPhrase.audioUrlEn
+          })
+        }
         
         // Attendre un peu pour permettre la mise à jour de l'état
         await new Promise(resolve => setTimeout(resolve, 300))
@@ -606,8 +620,17 @@ export default function AudioRepetitionExercise() {
         // Relancer le cycle avec la phrase suivante
         if (isActive) {
           console.log(`🔄 Relance cycle avec phrase ${nextIndex + 1}/${preloadedPhrases.length}`)
-          startCycle(undefined, nextIndex)
+          // Utiliser setTimeout pour éviter les problèmes de stack
+          setTimeout(() => {
+            if (isActive) {
+              startCycle(undefined, nextIndex)
+            }
+          }, 100)
+        } else {
+          console.log('⚠️ Cycle arrêté, ne pas relancer')
         }
+      } else {
+        console.log('⚠️ Pas de phrases préchargées ou cycle arrêté')
       }
     } catch (error) {
       console.error('Erreur dans le cycle préchargé:', error)
