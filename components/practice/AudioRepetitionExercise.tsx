@@ -210,10 +210,26 @@ export default function AudioRepetitionExercise() {
       const totalAudios = phrases.length * 2 + 1 // FR + EN pour chaque phrase + nouvelle phrase
       let loadedCount = 0
       
-      // Précharger "nouvelle phrase" en premier
-      if (nouvellePhraseUrl) {
+      // Précharger "nouvelle phrase" en premier (si URL disponible)
+      // Note: nouvellePhraseUrl peut ne pas être chargé encore, on essaie quand même
+      let nouvelleUrl = nouvellePhraseUrl
+      if (!nouvelleUrl) {
+        // Essayer de charger l'URL si pas encore disponible
         try {
-          const nouvelleAudio = await preloadAudio(nouvellePhraseUrl)
+          const response = await fetch('/api/audio/nouvelle-phrase')
+          if (response.ok) {
+            const data = await response.json()
+            nouvelleUrl = data.url
+            setNouvellePhraseUrl(nouvelleUrl)
+          }
+        } catch (err) {
+          console.warn('⚠️ Impossible de charger URL "nouvelle phrase"')
+        }
+      }
+      
+      if (nouvelleUrl) {
+        try {
+          const nouvelleAudio = await preloadAudio(nouvelleUrl)
           preloadedNouvellePhrase.current = nouvelleAudio
           loadedCount++
           setPreloadProgress(30 + Math.round(loadedCount / totalAudios * 70))
