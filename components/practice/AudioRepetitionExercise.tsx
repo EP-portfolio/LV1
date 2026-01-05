@@ -340,46 +340,77 @@ export default function AudioRepetitionExercise() {
       console.log('✅ Audio EN (2ème) terminé')
 
       // 6. Pause 10 secondes (utilisateur répète après deuxième lecture)
+      console.log('⏸️ Début pause 10s (2ème répétition)')
       setPhase('pause_10s_2')
       await new Promise(resolve => {
-        timeoutRef.current = setTimeout(resolve, 10000)
+        timeoutRef.current = setTimeout(() => {
+          console.log('✅ Pause 10s terminée')
+          resolve(undefined)
+        }, 10000)
       })
 
       // 7. Pause 5 secondes
+      console.log('⏸️ Début pause 5s')
       setPhase('pause_5s')
       await new Promise(resolve => {
-        timeoutRef.current = setTimeout(resolve, 5000)
+        timeoutRef.current = setTimeout(() => {
+          console.log('✅ Pause 5s terminée')
+          resolve(undefined)
+        }, 5000)
       })
 
       // 8. Audio "nouvelle phrase"
+      console.log('🔄 Début lecture "nouvelle phrase"')
       setPhase('playing_nouvelle_phrase')
       await playNouvellePhrase()
+      console.log('✅ "Nouvelle phrase" terminée')
 
       // 8b. Pause 2 secondes après "nouvelle phrase"
+      console.log('⏸️ Pause 2s après "nouvelle phrase"')
       setPhase('pause_2s')
       await new Promise(resolve => {
-        timeoutRef.current = setTimeout(resolve, 2000)
+        timeoutRef.current = setTimeout(() => {
+          console.log('✅ Pause 2s terminée, chargement nouvelle phrase...')
+          resolve(undefined)
+        }, 2000)
       })
 
       // 9. Charger une nouvelle phrase et recommencer
       if (isActive) {
+        console.log('🔄 Chargement nouvelle phrase...')
         const newPhrase = await loadPhrase()
+        console.log('✅ Nouvelle phrase chargée:', newPhrase ? newPhrase.frenchPhrase : 'null')
         
         // Vérifier à nouveau si toujours actif et si nouvelle phrase chargée
         if (isActive && newPhrase && newPhrase.audioUrlFr && newPhrase.audioUrlEn) {
+          console.log('✅ Nouvelle phrase valide, relance du cycle...')
           // Attendre un peu pour permettre la mise à jour de l'état React
           await new Promise(resolve => setTimeout(resolve, 300))
           
           // Relancer le cycle avec la nouvelle phrase directement
           if (isActive) {
+            console.log('🔄 Relance du cycle avec nouvelle phrase')
             startCycle(newPhrase)
+          } else {
+            console.log('⚠️ Cycle arrêté, ne pas relancer')
           }
         } else if (isActive && newPhrase) {
           // Phrase chargée mais fichiers audio manquants
+          console.error('❌ Fichiers audio manquants pour la nouvelle phrase')
           setError('Les fichiers audio ne sont pas disponibles pour cette phrase.')
           setIsActive(false)
           setPhase('idle')
+        } else if (isActive) {
+          // Erreur lors du chargement de la phrase
+          console.error('❌ Erreur chargement nouvelle phrase')
+          setError('Erreur lors du chargement de la nouvelle phrase.')
+          setIsActive(false)
+          setPhase('idle')
+        } else {
+          console.log('⚠️ Cycle arrêté (isActive = false)')
         }
+      } else {
+        console.log('⚠️ Cycle arrêté avant chargement nouvelle phrase')
       }
     } catch (error) {
       console.error('Erreur dans le cycle:', error)
