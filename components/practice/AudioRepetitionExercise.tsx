@@ -50,6 +50,7 @@ export default function AudioRepetitionExercise() {
   const audioRefNouvellePhrase = useRef<HTMLAudioElement | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const preloadedNouvellePhrase = useRef<PreloadedAudio | null>(null)
+  const isActiveRef = useRef<boolean>(false) // Ref pour suivre l'état actif sans problèmes de closure
   const router = useRouter()
 
   useEffect(() => {
@@ -527,6 +528,7 @@ export default function AudioRepetitionExercise() {
   // Cycle avec audios préchargés
   const startCycleWithPreloaded = async (preloadedPhrase: PreloadedPhrase, index: number, phrasesPool: PreloadedPhrase[]) => {
     setIsActive(true)
+    isActiveRef.current = true
     
     try {
       // 1. Lecture audio français (préchargé)
@@ -619,26 +621,29 @@ export default function AudioRepetitionExercise() {
           // Attendre un peu pour permettre la mise à jour de l'état
           await new Promise(resolve => setTimeout(resolve, 300))
           
-          // Relancer le cycle avec la phrase suivante directement
-          if (isActive) {
+          // Vérifier à nouveau avec la ref avant de relancer
+          if (isActiveRef.current) {
             console.log(`🔄 Relance cycle avec phrase ${nextIndex + 1}/${currentPool.length}`)
             // Appeler directement startCycleWithPreloaded pour éviter les problèmes de state
             setTimeout(() => {
-              if (isActive) {
+              if (isActiveRef.current) {
                 startCycleWithPreloaded(nextPhrase, nextIndex, currentPool)
+              } else {
+                console.log('⚠️ Cycle arrêté pendant l\'attente, ne pas relancer')
               }
             }, 100)
           } else {
-            console.log('⚠️ Cycle arrêté, ne pas relancer')
+            console.log('⚠️ Cycle arrêté, ne pas relancer (ref)')
           }
         } else {
           console.error('❌ Phrase suivante invalide ou audios manquants')
           setError('Erreur: phrase ou audios non disponibles')
           setIsActive(false)
+          isActiveRef.current = false
           setPhase('idle')
         }
       } else {
-        console.log(`⚠️ Pas de phrases préchargées (pool: ${currentPool.length}) ou cycle arrêté (isActive: ${isActive})`)
+        console.log(`⚠️ Pas de phrases préchargées (pool: ${currentPool.length}) ou cycle arrêté (isActive: ${isActive}, ref: ${stillActive})`)
       }
     } catch (error) {
       console.error('Erreur dans le cycle préchargé:', error)
@@ -821,6 +826,7 @@ export default function AudioRepetitionExercise() {
 
   const stopCycle = () => {
     setIsActive(false)
+    isActiveRef.current = false
     setPhase('idle')
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
