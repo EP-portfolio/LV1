@@ -311,20 +311,11 @@ export default function AudioRepetitionExercise() {
     }
 
     try {
-      // Précharger les fichiers audio pour éviter les problèmes de lecture
-      const preloadFr = new Audio(currentPhrase.audioUrlFr)
-      const preloadEn = new Audio(currentPhrase.audioUrlEn)
-      preloadFr.preload = 'auto'
-      preloadEn.preload = 'auto'
-      preloadFr.load()
-      preloadEn.load()
-
-      // Attendre un peu pour le préchargement
-      await new Promise(resolve => setTimeout(resolve, 300))
-
       // 1. Lecture audio français
       setPhase('playing_fr')
+      console.log('🎵 Début cycle - Lecture audio FR')
       await playAudio(currentPhrase.audioUrlFr, 'fr')
+      console.log('✅ Audio FR terminé, passage à pause 2s')
 
       // 2. Pause 2 secondes
       setPhase('pause_2s')
@@ -344,7 +335,9 @@ export default function AudioRepetitionExercise() {
 
       // 5. Lecture audio anglais (deuxième fois)
       setPhase('playing_en_2')
+      console.log('🎵 Lecture audio EN (2ème fois)')
       await playAudio(currentPhrase.audioUrlEn, 'en')
+      console.log('✅ Audio EN (2ème) terminé')
 
       // 6. Pause 10 secondes (utilisateur répète après deuxième lecture)
       setPhase('pause_10s_2')
